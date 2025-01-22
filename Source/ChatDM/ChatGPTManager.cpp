@@ -124,12 +124,6 @@ void UChatGPTManager::SendChatRequest(const FString& SystemMessageString, const 
 
 	// Add the user's message to the log
 	AddMessageToLog("user", UserInput);
-
-	// TODO: Remove this
-	/*
-	AddMessageToLog("assistant", "Message received.");
-	OnChatGptResponseReceived.Broadcast("Message received.", false);
-	*/
 }
 
 void UChatGPTManager::SendTestChatRequest(const FString& UserInput)
