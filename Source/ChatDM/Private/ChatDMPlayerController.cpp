@@ -1,5 +1,4 @@
 #include "ChatDMPlayerController.h"
-
 #include "ChatGPTManager.h"
 
 AChatDMPlayerController::AChatDMPlayerController()
@@ -10,7 +9,7 @@ AChatDMPlayerController::AChatDMPlayerController()
 void AChatDMPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
 	ChatGptManager = NewObject<UChatGPTManager>(this, UChatGPTManager::StaticClass(), TEXT("ChatGPTManager"));
 	if (!ChatGptManager)
 	{
@@ -27,7 +26,15 @@ void AChatDMPlayerController::BeginPlay()
 	ChatGptManager->Initialize();
 }
 
-void AChatDMPlayerController::SendChatDMRequest(const FString& UserInput, bool bIsTest) const
+void AChatDMPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (ChatGptManager)
+	{
+		ChatGptManager->Deinitialize();
+	}
+}
+
+void AChatDMPlayerController::SendChatDMRequest(const FString& PlayerPrompt, bool bIsInitialRequest) const
 {
 	if (!ChatGptManager)
 	{
@@ -35,12 +42,5 @@ void AChatDMPlayerController::SendChatDMRequest(const FString& UserInput, bool b
 		return;
 	}
 
-	if (!bIsTest)
-	{
-		ChatGptManager->SendChatRequest(UserInput);
-	}
-	else
-	{
-		ChatGptManager->SendTestChatRequest(UserInput);
-	}
+	ChatGptManager->SendAgentChatRequest(PlayerPrompt);
 }

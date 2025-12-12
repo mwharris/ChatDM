@@ -15,14 +15,14 @@ class CHATDM_API AChatDMPlayerController : public APlayerController
 
 public:
 	AChatDMPlayerController();
-	
+
 	/* Delegate fired when ChatGPTManager is created */
 	UPROPERTY(BlueprintAssignable, Category="ChatDM")
 	FOnChatGptManagerCreated OnChatGptManagerCreated;
-
+	
 	/* Send a request through the ChatGptManager */
 	UFUNCTION(BlueprintCallable, Category = "ChatDM")
-	void SendChatDMRequest(const FString& UserInput, bool bIsTest) const;
+	void SendChatDMRequest(const FString& PlayerPrompt, bool bIsInitialRequest) const;
 	
 	/* Accessor for ChatGptManager */
 	UFUNCTION(BlueprintCallable, Category = "ChatDM")
@@ -30,6 +30,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 private:
 	/* ChatGptManager reference */

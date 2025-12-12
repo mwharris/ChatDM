@@ -52,7 +52,7 @@ Dungeon Design:
 
 - Room 3: The Flame Tyrant's Arena.
   - **Intro**: Upon entering the arena, the Stellar Shard says: “It’s dangerous to go alone, take this!”.  A magical healing potion appears before the player, restoring all lost health if consumed.
-  - **Description**: You descend a set of wide, cracked stone stairs into a massive circular arena surrounded by a glowing moat of bubbling lava. At the center of the room is a circular stone platform, 20 feet in diameter, connected to the stairs by a narrow bridge. Six towering stone pillars, evenly spaced along the edge of the platform, reach up to the ceiling. The air is stifling, and the ground trembles as a hulking figure emerges: the Flame Tyrant, a towering, horned beast wreathed in fire, wielding a blazing whip and molten horns.  The Stellar Shard says: "Defeat the Flame Tyrant, my captor, and we may both be free of this place".
+  - **Description**: You descend a set of wide, cracked stone stairs into a massive circular arena surrounded by a glowing moat of bubbling lava. At the center of the room is a circular stone platform, 20 feet in diameter, connected to the stairs by a narrow bridge. Six towering stone pillars, evenly spaced along the edge of the platform, reach up to the ceiling. The air is stifling, and the ground trembles as a hulking figure emerges: the Flame Tyrant, a towering, horned beast wreathed in fire, glowing core sticking out of its chest, wielding a blazing whip and molten horns.  The Stellar Shard says: "Defeat the Flame Tyrant, my captor, and we may both be free of this place".
   - **Hint**: Observing the pillars reveals cracks and previous impact marks, suggesting they can be broken. The Flame Tyrant’s ramming attack could be used to collapse them. The Stellar Shard hums faintly, resonating with the core of the beast.
   - **Flame Tyrant Mechanics**:
     - Immune to all damage except its protective flesh and core.
@@ -63,8 +63,7 @@ Dungeon Design:
   - **Solution**:
     1. Lure the Tyrant into ramming a pillar, causing it to collapse and stun the beast.
     2. Use the sword to slash through the protective flesh covering its heart.
-    3. Repeat this process three times to fully expose the core.
-    4. Drive the Stellar Shard into the exposed core to kill the Tyrant instantly.
+    3. Drive the Stellar Shard into the exposed core to kill the Tyrant instantly.
   - **Environmental Hazards**:
     - Lava moat surrounds the platform; falling off results in instant death.
     - The platform weakens as the fight progresses, limiting safe areas.
