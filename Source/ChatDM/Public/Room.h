@@ -19,6 +19,9 @@ struct FRoom
 	UPROPERTY(meta = (JsonProperty = "description"))
 	FString Description;
 
+	UPROPERTY(meta = (JsonProperty = "dynamicDetailsAdded"))
+	TArray<FString> DynamicDetails;
+
 	UPROPERTY(meta = (JsonProperty = "items"))
 	TArray<FString> Items;
 
