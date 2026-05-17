@@ -72,7 +72,7 @@ void UNarratorAgent::SendMessage(const FString& PlayerInput, const FString& Curr
 	const FString& RulesResultJson, const FString& WorldReactionJson)
 {
 	// Wrap the World State and Player Input into a single message.
-	const FString WrappedMessage = BuildWrappedUserMessage(CurrentWorldStateJson, RulesResultJson, PlayerInput);
+	const FString WrappedMessage = BuildWrappedUserMessage(CurrentWorldStateJson, RulesResultJson, WorldReactionJson, PlayerInput);
 	
 	// Update the message log with the new message
 	const FChatMessage NewMessage = FChatMessage("user", WrappedMessage);

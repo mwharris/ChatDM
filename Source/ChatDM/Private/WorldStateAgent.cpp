@@ -59,7 +59,7 @@ void UWorldStateAgent::HandleResponse(const FString& ResponseContent, const FStr
 
 	if (OnWorldReactionReady.IsBound())
 	{
-		OnWorldReactionReady.Broadcast(WorldReaction, WorldReactionJson, PlayerInput, CachedRulesResultJson);
+		OnWorldReactionReady.Broadcast(WorldReaction, CachedRulesResultJson, WorldReactionJson, PlayerInput);
 	}
 }
 
