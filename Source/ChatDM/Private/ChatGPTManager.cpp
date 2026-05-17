@@ -1,14 +1,12 @@
 #include "ChatGPTManager.h"
 
-#include "ChatPromptRow.h"
 #include "Enemy.h"
-#include "HttpModule.h"
 #include "JsonObjectConverter.h"
-#include "Interfaces/IHttpRequest.h"
-#include "Interfaces/IHttpResponse.h"
 #include "NarratorAgent.h"
 #include "RulesAgent.h"
 #include "RulesUpdate.h"
+#include "WorldReaction.h"
+#include "WorldStateAgent.h"
 
 void UChatGPTManager::Initialize()
 {
@@ -28,6 +26,9 @@ void UChatGPTManager::InitializeAgents()
 
 	NarratorAgent = NewObject<UNarratorAgent>(this, UNarratorAgent::StaticClass(), TEXT("NarratorAgent"));
 	NarratorAgent->Initialize(TEXT(""));
+	
+	WorldStateAgent = NewObject<UWorldStateAgent>(this, UWorldStateAgent::StaticClass(), TEXT("WorldStateAgent"));
+	WorldStateAgent->Initialize(TEXT(""));
 	
 	FEnemy Goblin;
 	Goblin.EnemyIndex = 0;
@@ -130,11 +131,11 @@ void UChatGPTManager::HandleRulesResult(const FRulesUpdate& RulesWorldStateUpdat
 	{
 		WorldState.CurrentRoomIndex = RulesWorldStateUpdate.StateChanges.CurrentRoomIndex;
 	}
-	
-	ExecuteNarratorAgent(PlayerInput, RulesResultJson);
+
+	ExecuteWorldStateAgent(PlayerInput, RulesResultJson);
 }
 
-void UChatGPTManager::ExecuteNarratorAgent(const FString& PlayerInput, const FString& RulesResultJson /*=TEXT("N/A")*/, const bool bIsInitial /*=false*/)
+void UChatGPTManager::ExecuteNarratorAgent(const FString& PlayerInput, const FString& RulesResultJson /*=TEXT("N/A")*/, const FString& WorldReactionJson /*=TEXT("N/A")*/, const bool bIsInitial /*=false*/)
 {
 	if (!IsValid(NarratorAgent))
 	{
@@ -158,8 +159,19 @@ void UChatGPTManager::ExecuteNarratorAgent(const FString& PlayerInput, const FSt
 	// Default case: send the player's input with world state differences.
 	else
 	{
-		NarratorAgent->SendMessage(PlayerInput, CurrentWorldStateJSON, RulesResultJson);
+		NarratorAgent->SendMessage(PlayerInput, CurrentWorldStateJSON, RulesResultJson, WorldReactionJson);
 	}
+}
+
+void UChatGPTManager::ExecuteWorldStateAgent(const FString& PlayerInput, const FString& RulesResultJson)
+{
+	if (!WorldStateAgent->OnWorldReactionReady.IsAlreadyBound(this, &UChatGPTManager::HandleWorldStateResult))
+	{
+		WorldStateAgent->OnWorldReactionReady.AddDynamic(this, &UChatGPTManager::HandleWorldStateResult);
+	}
+
+	const FString WorldStateJson = WorldStateToJson(WorldState);
+	WorldStateAgent->SendMessage(PlayerInput, WorldStateJson, RulesResultJson);
 }
 
 void UChatGPTManager::HandleNarratorResult(const FString& NarratorResult, const FString& PlayerInput)
@@ -167,6 +179,26 @@ void UChatGPTManager::HandleNarratorResult(const FString& NarratorResult, const 
 	// TODO: We shouldn't need to update WorldState here because Narrator should not be changing state.
 	
 	OnChatGptResponseReceived.Broadcast(NarratorResult, false);
+}
+
+void UChatGPTManager::HandleWorldStateResult(const FWorldReaction& WorldReaction, const FString& RulesResultJson, const FString& WorldReactionJson,
+	const FString& PlayerInput)
+{
+	// Apply NPC status/intent updates to WorldState
+	for (const FEnemyReaction& Reaction : WorldReaction.EnemyReactions)
+	{
+		for (FRoom& Room : WorldState.Rooms)
+		{
+			if (FEnemy* Enemy = Room.Enemies.FindByPredicate(
+				[&](const FEnemy& E){ return E.Name == Reaction.Name; }))
+			{
+				Enemy->Status      = Reaction.NewStatus;
+				Enemy->IntentOrGoal = Reaction.NewIntent;
+			}
+		}
+	}
+
+	ExecuteNarratorAgent(PlayerInput, RulesResultJson, WorldReactionJson);
 }
 
 FString UChatGPTManager::WorldStateToJson(const FWorldState& State)

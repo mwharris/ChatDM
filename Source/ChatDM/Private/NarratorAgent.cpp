@@ -68,7 +68,8 @@ void UNarratorAgent::SendInitialMessage(const FString& CurrentWorldStateJson)
 		});
 }
 
-void UNarratorAgent::SendMessage(const FString& PlayerInput, const FString& CurrentWorldStateJson, const FString& RulesResultJson)
+void UNarratorAgent::SendMessage(const FString& PlayerInput, const FString& CurrentWorldStateJson,
+	const FString& RulesResultJson, const FString& WorldReactionJson)
 {
 	// Wrap the World State and Player Input into a single message.
 	const FString WrappedMessage = BuildWrappedUserMessage(CurrentWorldStateJson, RulesResultJson, PlayerInput);

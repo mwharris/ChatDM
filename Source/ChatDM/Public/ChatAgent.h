@@ -28,8 +28,9 @@ protected:
 	/** Meant for children to override so they can handle the response as they see fit. */
 	virtual void HandleResponse(const FString& ResponseContent, const FString& PlayerInput) {};
 
-	/** Helper function that takes World State JSON and the Player's Input and wraps it in a single message. */
-	FString BuildWrappedUserMessage(const FString& CurrentWorldStateJson, const FString& UpdatedWorldStateJson, const FString& PlayerInput) const;
+	/** Helper function that takes JSON and the Player's Input and wraps it in a single message. */
+	FString BuildWrappedUserMessage(const FString& CurrentWorldStateJson, const FString& RulesResultJson, const FString& PlayerInput) const;
+	FString BuildWrappedUserMessage(const FString& CurrentWorldStateJson, const FString& RulesResultJson, const FString& WorldReactionJson, const FString& PlayerInput) const;
 	FString BuildWrappedUserMessage(const FString& CurrentWorldStateJson, const FString& PlayerInput) const;
 	
 };

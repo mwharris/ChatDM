@@ -1,9 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "WorldStateAgent.h"
 
 #include "ChatPromptRow.h"
+#include "JsonObjectConverter.h"
+#include "WorldReaction.h"
 
 void UWorldStateAgent::Initialize(const FString& InPrompt)
 {
@@ -36,16 +37,13 @@ void UWorldStateAgent::Initialize(const FString& InPrompt)
 	MessageLog.Push(SystemMessage);
 }
 
-void UWorldStateAgent::SendMessage(const FString& PlayerInput, const FString& WorldStateJson)
+void UWorldStateAgent::SendMessage(const FString& PlayerInput, const FString& WorldStateJson, const FString& RulesResultJson)
 {
-	// Wrap the World State and Player Input into a single message.
-	const FString WrappedMessage = BuildWrappedUserMessage(WorldStateJson, PlayerInput);
-	
-	// Update the message log with the new message
-	const FChatMessage NewMessage = FChatMessage("user", WrappedMessage);
-	MessageLog.Push(NewMessage);
+	CachedRulesResultJson = RulesResultJson;
 
-	// Call the parent to actually send the message to AI
+	const FString WrappedMessage = BuildWrappedUserMessage(WorldStateJson, RulesResultJson, PlayerInput);
+	MessageLog.Push(FChatMessage("user", WrappedMessage));
+
 	Super::SendMessage(MessageLog,
 		[this, PlayerInput](const FString& ResponseContent)
 		{
@@ -55,5 +53,48 @@ void UWorldStateAgent::SendMessage(const FString& PlayerInput, const FString& Wo
 
 void UWorldStateAgent::HandleResponse(const FString& ResponseContent, const FString& PlayerInput)
 {
-	
+	FString WorldReactionJson;
+	FWorldReaction WorldReaction;
+	JsonToWorldReaction(ResponseContent, WorldReaction, WorldReactionJson);
+
+	if (OnWorldReactionReady.IsBound())
+	{
+		OnWorldReactionReady.Broadcast(WorldReaction, WorldReactionJson, PlayerInput, CachedRulesResultJson);
+	}
+}
+
+void UWorldStateAgent::JsonToWorldReaction(const FString& InJson, FWorldReaction& OutReaction, FString& OutReactionJson)
+{
+	FString CleanJson = InJson;
+
+	CleanJson.TrimStartAndEndInline();
+
+	if (CleanJson.Len() > 0 && CleanJson[0] == 0xFEFF)
+	{
+		CleanJson.RemoveAt(0);
+	}
+
+	CleanJson = CleanJson.Replace(TEXT("```json"), TEXT(""));
+	CleanJson = CleanJson.Replace(TEXT("```JSON"), TEXT(""));
+	CleanJson = CleanJson.Replace(TEXT("```"), TEXT(""));
+	OutReactionJson = CleanJson;
+
+	UE_LOG(LogTemp, Log, TEXT("[WorldStateAgent::JsonToWorldReaction] Cleaned JSON: %s"), *CleanJson);
+
+	TSharedPtr<FJsonObject> RootObj;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(CleanJson);
+	if (!FJsonSerializer::Deserialize(Reader, RootObj) || !RootObj.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("[WorldStateAgent::JsonToWorldReaction] Failed to parse JSON: %s"), *CleanJson);
+		return;
+	}
+
+	if (!FJsonObjectConverter::JsonObjectToUStruct(
+		RootObj.ToSharedRef(),
+		FWorldReaction::StaticStruct(),
+		&OutReaction,
+		0, 0))
+	{
+		UE_LOG(LogTemp, Error, TEXT("[WorldStateAgent::JsonToWorldReaction] Failed to convert JSON to FWorldReaction."));
+	}
 }

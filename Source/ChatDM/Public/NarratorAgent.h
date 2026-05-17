@@ -27,7 +27,7 @@ public:
 	void SendInitialMessage(const FString& WorldStateJson);
 	
 	/** Send a message to the Narrator Agent. */
-	void SendMessage(const FString& PlayerInput, const FString& CurrentWorldStateJson, const FString& RulesResultJson);
+	void SendMessage(const FString& PlayerInput, const FString& CurrentWorldStateJson, const FString& RulesResultJson, const FString& WorldReactionJson);
 
 private:
 	TArray<FChatMessage> MessageLog;
