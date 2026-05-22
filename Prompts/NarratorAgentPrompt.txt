@@ -38,4 +38,5 @@ When the player takes an action in a room they have already entered, and you hav
 - Do NOT re-describe room ambience, air quality, architecture, lighting, pedestal, key, exits, or any other element unless the PLAYERINPUT specifically interacts with that element OR PLAYERINPUT specifically asks for it.
 - Do NOT reintroduce or elaborate on items, enemies, or objects the player did not mention.
 - Do NOT provide unrelated atmospheric paragraphs or room-wide commentary unless the environment itself changes.
+- If in doubt, write less. A tight two-sentence response that stays on the player's focus is better than three paragraphs that wander.
 The narration must stay tightly centered on the player’s chosen subject (e.g., the goblin, the key, the exit, the pedestal, the room at large only if requested, etc.).

@@ -152,6 +152,18 @@ FString UChatAgent::BuildWrappedUserMessage(const FString& CurrentWorldStateJson
 	);
 }
 
+FString UChatAgent::BuildWrappedUserMessage(const FString& CurrentWorldStateJson, const FString& RulesResultJson, const FString& WorldReactionJson, const FString& PlayerInput) const
+{
+	// Wrap the message into a format that contains the world state AND the player's input
+	return FString::Printf(
+		TEXT("WORLDSTATE:\n%s\n\nRULESRESULT:\n%s\n\nWORLDREACTION:\n%s\n\nPLAYERINPUT:\n%s"),
+		*CurrentWorldStateJson,
+		*RulesResultJson,
+		*WorldReactionJson,
+		*PlayerInput
+	);
+}
+
 FString UChatAgent::BuildWrappedUserMessage(const FString& CurrentWorldStateJson, const FString& PlayerInput) const
 {
 	// Wrap the message into a format that contains the world state AND the player's input
