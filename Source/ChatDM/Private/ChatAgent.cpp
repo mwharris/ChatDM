@@ -1,6 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "ChatAgent.h"
+
+#include "ChatPromptRow.h"
 #include "HttpModule.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Dom/JsonObject.h"
@@ -139,6 +141,20 @@ void UChatAgent::SendMessage(TArray<FChatMessage>& MessageLog,
 
 	// Finally, send the request
 	HttpRequest->ProcessRequest();
+}
+
+bool UChatAgent::TryLoadPromptRow(const UDataTable* DataTable, const FName& RowName, const FString& CallerContext,
+	FString& OutPrompt)
+{
+	FChatPromptRow* Row = DataTable->FindRow<FChatPromptRow>(RowName, *CallerContext, true);
+	if (!Row)
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s: Row '%s' not found in DataTable."), *CallerContext, *RowName.ToString());
+		return false;
+	}
+	OutPrompt = Row->PromptText;
+	UE_LOG(LogTemp, Log, TEXT("UChatAgent::TryLoadPromptRow(%s): Loaded Prompt: %s"), *RowName.ToString(), *OutPrompt);
+	return true;
 }
 
 FString UChatAgent::BuildWrappedUserMessage(const FString& CurrentWorldStateJson, const FString& RulesResultJson, const FString& PlayerInput) const

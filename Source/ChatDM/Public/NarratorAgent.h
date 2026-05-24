@@ -22,18 +22,28 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="ChatDM | NarratorAgent")
 	FOnNarratorResultReady OnNarratorResultReady;
 	
+	/** Override from ChatAgent */
 	virtual void Initialize(const FString& InPrompt) override;
 
+	/** Sends the initial prompt to start the dialogue and setup the scene for the player */
 	void SendInitialMessage(const FString& WorldStateJson);
 	
 	/** Send a message to the Narrator Agent. */
 	void SendMessage(const FString& PlayerInput, const FString& CurrentWorldStateJson, const FString& RulesResultJson, const FString& WorldReactionJson);
 
 private:
+	/** History of messages between the player and this agent. */
 	TArray<FChatMessage> MessageLog;
 
+	/** The prompt that will be sent in SendInitialMessage. */
 	FString StartupPrompt;
+
+	/** The prompt that will be used to tell Narrator to re-evaluate its original narration. */
+	FString EvaluationPrompt;
 	
+	/** Handle the response from the agent and broadcast back to the UI. */
 	virtual void HandleResponse(const FString& ResponseContent, const FString& PlayerInput) override;
-	
+
+	/** TODO: Comment */
+	void ValidateNarration(const FString& Narration, const FString& PlayerInput);
 };

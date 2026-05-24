@@ -20,21 +20,12 @@ void UWorldStateAgent::Initialize(const FString& InPrompt)
 	}
 
 	// Get the initialize row from the DT
-	FName RowName = TEXT("WorldState_SystemMessage");
-	FChatPromptRow* Row = DataTable->FindRow<FChatPromptRow>(RowName, TEXT("UWorldStateAgent::Initialize"), true);
-	if (!Row)
+	if (!TryLoadPromptRow(DataTable,TEXT("WorldState_SystemMessage"),    TEXT("UWorldStateAgent::Initialize"), SystemPrompt))
 	{
-		UE_LOG(LogTemp, Error, TEXT("UWorldStateAgent::Initialize(): Row %s not found in DataTable."), *RowName.ToString());
 		return;
 	}
 
-	// Pull out the system message prompt
-	const FString InitializePrompt = Row->PromptText;
-	UE_LOG(LogTemp, Log, TEXT("UWorldStateAgent::Initialize(): Loaded Prompt: %s"), *InitializePrompt);
-
-	// Call parent to finish initialization with the  system message
-	SystemMessage = FChatMessage("system", InitializePrompt);
-	MessageLog.Push(SystemMessage);
+	SystemMessage = FChatMessage("system", SystemPrompt);
 }
 
 void UWorldStateAgent::SendMessage(const FString& PlayerInput, const FString& WorldStateJson, const FString& RulesResultJson)
@@ -42,9 +33,13 @@ void UWorldStateAgent::SendMessage(const FString& PlayerInput, const FString& Wo
 	CachedRulesResultJson = RulesResultJson;
 
 	const FString WrappedMessage = BuildWrappedUserMessage(WorldStateJson, RulesResultJson, PlayerInput);
-	MessageLog.Push(FChatMessage("user", WrappedMessage));
 
-	Super::SendMessage(MessageLog,
+	// No need to track all messages, just send System message and the new message
+	TArray<FChatMessage> SingleTurnMessages;
+	SingleTurnMessages.Push(SystemMessage);
+	SingleTurnMessages.Push(FChatMessage("user", WrappedMessage));
+	
+	Super::SendMessage(SingleTurnMessages,
 		[this, PlayerInput](const FString& ResponseContent)
 		{
 			HandleResponse(ResponseContent, PlayerInput);

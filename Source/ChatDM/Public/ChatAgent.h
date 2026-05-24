@@ -25,6 +25,12 @@ public:
 	void SendMessage(TArray<FChatMessage>& MessageLog, TFunction<void(const FString& ResponseContent)> OnResponseCallback);
 
 protected:
+	/** System prompt that will define what this agent does and is sent in every message. */
+	FString SystemPrompt;
+	
+	/** Helper function to load a prompt from the prompts datatable */
+	static bool TryLoadPromptRow(const UDataTable* DataTable, const FName& RowName, const FString& CallerContext, FString& OutPrompt);
+
 	/** Meant for children to override so they can handle the response as they see fit. */
 	virtual void HandleResponse(const FString& ResponseContent, const FString& PlayerInput) {};
 

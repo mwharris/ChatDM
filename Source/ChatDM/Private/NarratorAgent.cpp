@@ -8,42 +8,22 @@ void UNarratorAgent::Initialize(const FString& InPrompt)
 {
 	UE_LOG(LogTemp, Log, TEXT("UNarratorAgent::Initialize(): NarratorAgent initialized."));
 
-	// Get a reference to the prompts DT
 	static const FString DataTablePath = TEXT("/Game/Assets/DT_Prompts.DT_Prompts");
-	UDataTable* DataTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *DataTablePath));
+	const UDataTable* DataTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *DataTablePath));
 	if (!DataTable)
 	{
 		UE_LOG(LogTemp, Error, TEXT("UNarratorAgent::Initialize(): Failed to load DataTable at %s"), *DataTablePath);
 		return;
 	}
 
-	// Get the initialize row from the DT
-	FName RowName = TEXT("Narrator_SystemMessage");
-	FChatPromptRow* Row = DataTable->FindRow<FChatPromptRow>(RowName, TEXT("UNarratorAgent::Initialize"), true);
-	if (!Row)
-	{
-		UE_LOG(LogTemp, Error, TEXT("UNarratorAgent::Initialize(): Row %s not found in DataTable."), *RowName.ToString());
-		return;
-	}
+	// Load our system, startup, and evaluation prompts
+	if (!TryLoadPromptRow(DataTable,TEXT("Narrator_SystemMessage"),    TEXT("UNarratorAgent::Initialize"), SystemPrompt)) return;
+	if (!TryLoadPromptRow(DataTable, TEXT("Narrator_StartupPrompt"),    TEXT("UNarratorAgent::Initialize"), StartupPrompt)) return;
+	if (!TryLoadPromptRow(DataTable, TEXT("Narrator_EvaluationPrompt"), TEXT("UNarratorAgent::Initialize"), EvaluationPrompt)) return;
 
-	// Pull out the system message prompt
-	const FString InitializePrompt = Row->PromptText;
-	UE_LOG(LogTemp, Log, TEXT("UNarratorAgent::Initialize(): Loaded Prompt: %s"), *InitializePrompt);
-
-	// Call parent to finish initialization with the  system message
-	SystemMessage = FChatMessage("system", InitializePrompt);
+	// System message should always be sent
+	SystemMessage = FChatMessage("system", SystemPrompt);
 	MessageLog.Push(SystemMessage);
-
-	// Also get the startup prompt for the initial message from the DT
-	RowName = TEXT("Narrator_StartupPrompt");
-	Row = DataTable->FindRow<FChatPromptRow>(RowName, TEXT("UNarratorAgent::SendInitialMessage"), true);
-	if (!Row)
-	{
-		UE_LOG(LogTemp, Error, TEXT("UNarratorAgent::Initialize(): Row %s not found in DataTable."), *RowName.ToString());
-		return;
-	}
-
-	StartupPrompt = Row->PromptText;
 }
 
 void UNarratorAgent::SendInitialMessage(const FString& CurrentWorldStateJson)
@@ -71,12 +51,11 @@ void UNarratorAgent::SendInitialMessage(const FString& CurrentWorldStateJson)
 void UNarratorAgent::SendMessage(const FString& PlayerInput, const FString& CurrentWorldStateJson,
 	const FString& RulesResultJson, const FString& WorldReactionJson)
 {
-	// Wrap the World State and Player Input into a single message.
+	// Wrap the World State, Rules Result, and Player Input into a single message.
 	const FString WrappedMessage = BuildWrappedUserMessage(CurrentWorldStateJson, RulesResultJson, WorldReactionJson, PlayerInput);
 	
 	// Update the message log with the new message
-	const FChatMessage NewMessage = FChatMessage("user", WrappedMessage);
-	MessageLog.Push(NewMessage);
+	MessageLog.Push(FChatMessage("user", WrappedMessage));
 
 	// Call the parent to actually send the message to AI
 	Super::SendMessage(MessageLog,
@@ -90,10 +69,66 @@ void UNarratorAgent::HandleResponse(const FString& ResponseContent, const FStrin
 {
 	UE_LOG(LogTemp, Log, TEXT("[NarratorAgent] Response: %s"), *ResponseContent);
 
-	// TODO: Actually process the response...
 
-	if (OnNarratorResultReady.IsBound())
+	// Re-validate the narration if we're not starting up
+	if (MessageLog.Num() > 2)
 	{
-		OnNarratorResultReady.Broadcast(ResponseContent, PlayerInput);
+		// Push narration as an assistant message and then validate
+		MessageLog.Push(FChatMessage("assistant", ResponseContent));
+		ValidateNarration(ResponseContent, PlayerInput);
 	}
+	// If we are, just use the result as-is
+	else
+	{
+		if (OnNarratorResultReady.IsBound())
+		{
+			OnNarratorResultReady.Broadcast(ResponseContent, PlayerInput);
+		}
+	}
+}
+
+void UNarratorAgent::ValidateNarration(const FString& Narration, const FString& PlayerInput)
+{
+	MessageLog.Push(FChatMessage("user", EvaluationPrompt));
+
+	Super::SendMessage(MessageLog, [this, Narration, PlayerInput](const FString& EvalResponse)
+	{
+		// Always remove the eval prompt from the history
+		MessageLog.Pop();
+
+		FString FinalNarration = Narration;
+
+		TSharedPtr<FJsonObject> EvalJson;
+		const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(EvalResponse);
+		if (FJsonSerializer::Deserialize(Reader, EvalJson) && EvalJson.IsValid())
+		{
+			const bool bApproved = EvalJson->GetBoolField(TEXT("approved"));
+			if (!bApproved)
+			{
+				FString Revision = EvalJson->GetStringField(TEXT("revision"));
+				if (!Revision.IsEmpty())
+				{
+					// Replace original narration with revision in the log
+					MessageLog.Pop();
+					MessageLog.Push(FChatMessage("assistant", Revision));
+					FinalNarration = Revision;
+					UE_LOG(LogTemp, Log, TEXT("[NarratorAgent] Narration revised: %s"), *Revision);
+				}
+			}
+			else
+			{
+				UE_LOG(LogTemp, Log, TEXT("[NarratorAgent] Narration approved."));
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[NarratorAgent] Failed to parse eval response, using original."));
+		}
+		
+		// Broadcast that our final narration is ready
+		if (OnNarratorResultReady.IsBound())
+		{
+			OnNarratorResultReady.Broadcast(FinalNarration, PlayerInput);
+		}
+	});
 }

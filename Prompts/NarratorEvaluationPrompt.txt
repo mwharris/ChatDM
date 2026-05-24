@@ -1,0 +1,10 @@
+Review the narration you just wrote. Check for these violations:
+1. Does it contradict RULESRESULT? If success was false, failure must be clear. If success was true, do not imply failure.
+2. Does it contradict WORLDREACTION? Every enemy action in WORLDREACTION must be reflected.
+3. Does it re-describe room elements the player did not interact with this turn?
+4. Does it invent items, enemies, or details not present in WORLDSTATE?
+
+Respond with a JSON object only. No markdown. No text outside the JSON.
+
+If no violations: {"approved": true, "revision": ""}
+If violations exist: {"approved": false, "revision": "corrected narration here"}

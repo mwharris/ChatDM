@@ -32,9 +32,6 @@ private:
 	/** Cache the RulesResultJson so we don't need to pass it around too much. */
 	FString CachedRulesResultJson;
 	
-	/** Message history. */
-	TArray<FChatMessage> MessageLog;
-
 	/** Handle response from ChatGPT. */
 	virtual void HandleResponse(const FString& ResponseContent, const FString& PlayerInput) override;
 
