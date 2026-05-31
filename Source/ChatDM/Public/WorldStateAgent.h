@@ -21,7 +21,7 @@ public:
 	/** Fired when the WorldStateAgent has processed the HTTP response */
 	UPROPERTY(BlueprintAssignable, Category="ChatDM | WorldStateAgent")
 	FOnWorldReactionReady OnWorldReactionReady;
-	
+
 	/** Override from ChatAgent */
 	virtual void Initialize(const FString& InPrompt) override;
 
@@ -31,10 +31,7 @@ public:
 private:
 	/** Cache the RulesResultJson so we don't need to pass it around too much. */
 	FString CachedRulesResultJson;
-	
-	/** Handle response from ChatGPT. */
-	virtual void HandleResponse(const FString& ResponseContent, const FString& PlayerInput) override;
 
-	/** Helper function to parse the JSON from the response into structs. */
-	void JsonToWorldReaction(const FString& InJson, FWorldReaction& OutReaction, FString& OutReactionJson);
+	/** Build tool definitions for set_enemy_status / set_enemy_intent */
+	TArray<TSharedPtr<FJsonObject>> BuildToolDefinitions();
 };

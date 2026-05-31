@@ -55,6 +55,8 @@ void UChatGPTManager::InitializeAgents()
 void UChatGPTManager::Deinitialize()
 {
 	RulesAgent->OnRulesResultReady.RemoveAll(this);
+	WorldStateAgent->OnWorldReactionReady.RemoveAll(this);
+	NarratorAgent->OnNarratorResultReady.RemoveAll(this);
 }
 
 void UChatGPTManager::SendInitialChatRequest()
@@ -120,10 +122,16 @@ void UChatGPTManager::HandleRulesResult(const FRulesUpdate& RulesWorldStateUpdat
 		}
 	}
 
-	// Update player held items when it changes.
-	if (!RulesWorldStateUpdate.StateChanges.PlayerHeldItems.IsEmpty())
+	// Add newly acquired items
+	for (const FString& Item : RulesWorldStateUpdate.ItemsPickedUp)
 	{
-		WorldState.PlayerHeldItems = RulesWorldStateUpdate.StateChanges.PlayerHeldItems;
+		WorldState.PlayerHeldItems.AddUnique(Item);
+	}
+
+	// Remove consumed or lost items
+	for (const FString& Item : RulesWorldStateUpdate.ItemsRemoved)
+	{
+		WorldState.PlayerHeldItems.Remove(Item);
 	}
 
 	// Update the current room index if we changed rooms.
@@ -135,7 +143,7 @@ void UChatGPTManager::HandleRulesResult(const FRulesUpdate& RulesWorldStateUpdat
 	ExecuteWorldStateAgent(PlayerInput, RulesResultJson);
 }
 
-void UChatGPTManager::ExecuteNarratorAgent(const FString& PlayerInput, const FString& RulesResultJson /*=TEXT("N/A")*/, const FString& WorldReactionJson /*=TEXT("N/A")*/, const bool bIsInitial /*=false*/)
+void UChatGPTManager::ExecuteNarratorAgent(const FString& PlayerInput, const FString& RulesResultJson /*=TEXT("N/A")*/, const FString& WorldReactionJson /*=TEXT("N/A")*/)
 {
 	if (!IsValid(NarratorAgent))
 	{
@@ -149,18 +157,9 @@ void UChatGPTManager::ExecuteNarratorAgent(const FString& PlayerInput, const FSt
 		NarratorAgent->OnNarratorResultReady.AddDynamic(this, &UChatGPTManager::HandleNarratorResult);
 	}
 
+	// Send the player's input with world state differences.
 	const FString CurrentWorldStateJSON = WorldStateToJson(WorldState);
-
-	// Send an intro message when the game starts.
-	if (bIsInitial)
-	{
-		NarratorAgent->SendInitialMessage(CurrentWorldStateJSON);
-	}
-	// Default case: send the player's input with world state differences.
-	else
-	{
-		NarratorAgent->SendMessage(PlayerInput, CurrentWorldStateJSON, RulesResultJson, WorldReactionJson);
-	}
+	NarratorAgent->SendMessage(PlayerInput, CurrentWorldStateJSON, RulesResultJson, WorldReactionJson);
 }
 
 void UChatGPTManager::ExecuteWorldStateAgent(const FString& PlayerInput, const FString& RulesResultJson)

@@ -31,6 +31,14 @@ protected:
 	/** Helper function to load a prompt from the prompts datatable */
 	static bool TryLoadPromptRow(const UDataTable* DataTable, const FName& RowName, const FString& CallerContext, FString& OutPrompt);
 
+	void SendMessageWithTools(TArray<TSharedPtr<FJsonObject>> Messages,
+		const TArray<TSharedPtr<FJsonObject>>& Tools,
+		TFunction<FString(const FString& ToolName, const TSharedPtr<FJsonObject>& Args)> OnToolCall,
+		TFunction<void(const FString& FinalContent)> OnComplete);
+
+	/** Converts an FChatMessage into a shareable FJsonObject */
+	static TSharedPtr<FJsonObject> ChatMessageToJSON(const FChatMessage& Message);
+	
 	/** Meant for children to override so they can handle the response as they see fit. */
 	virtual void HandleResponse(const FString& ResponseContent, const FString& PlayerInput) {};
 

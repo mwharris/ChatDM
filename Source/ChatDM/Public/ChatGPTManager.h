@@ -62,7 +62,7 @@ public:
 	void ExecuteWorldStateAgent(const FString& PlayerInput, const FString& RulesResultJson);
 	
 	/** Send player input to the Narrator Agent for processing */
-	void ExecuteNarratorAgent(const FString& PlayerInput, const FString& RulesResultJson = TEXT("N/A"), const FString& WorldReactionJson = TEXT("N/A"), const bool bIsInitial = false);
+	void ExecuteNarratorAgent(const FString& PlayerInput, const FString& RulesResultJson = TEXT("N/A"), const FString& WorldReactionJson = TEXT("N/A"));
 	
 private:
 	/** We need to store all message history ourselves */

@@ -8,9 +8,8 @@
 
 void UWorldStateAgent::Initialize(const FString& InPrompt)
 {
-	UE_LOG(LogTemp, Log, TEXT("UWorldStateAgent::Initialize(): NarratorAgent initialized."));
+	UE_LOG(LogTemp, Log, TEXT("UWorldStateAgent::Initialize(): WorldStateAgent initialized."));
 
-	// Get a reference to the prompts DT
 	static const FString DataTablePath = TEXT("/Game/Assets/DT_Prompts.DT_Prompts");
 	UDataTable* DataTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *DataTablePath));
 	if (!DataTable)
@@ -19,13 +18,74 @@ void UWorldStateAgent::Initialize(const FString& InPrompt)
 		return;
 	}
 
-	// Get the initialize row from the DT
-	if (!TryLoadPromptRow(DataTable,TEXT("WorldState_SystemMessage"),    TEXT("UWorldStateAgent::Initialize"), SystemPrompt))
+	if (!TryLoadPromptRow(DataTable, TEXT("WorldState_SystemMessage"), TEXT("UWorldStateAgent::Initialize"), SystemPrompt))
 	{
 		return;
 	}
 
 	SystemMessage = FChatMessage("system", SystemPrompt);
+}
+
+TArray<TSharedPtr<FJsonObject>> UWorldStateAgent::BuildToolDefinitions()
+{
+	TArray<TSharedPtr<FJsonObject>> Tools;
+
+	auto MakeTool = [](const FString& Name, const FString& Description, TSharedPtr<FJsonObject> Parameters)
+	{
+		TSharedPtr<FJsonObject> Function = MakeShareable(new FJsonObject());
+		Function->SetStringField(TEXT("name"), Name);
+		Function->SetStringField(TEXT("description"), Description);
+		Function->SetObjectField(TEXT("parameters"), Parameters);
+
+		TSharedPtr<FJsonObject> Tool = MakeShareable(new FJsonObject());
+		Tool->SetStringField(TEXT("type"), TEXT("function"));
+		Tool->SetObjectField(TEXT("function"), Function);
+
+		return Tool;
+	};
+
+	auto MakeParams = [](TSharedPtr<FJsonObject> Properties, TArray<FString> Required)
+	{
+		TSharedPtr<FJsonObject> Params = MakeShareable(new FJsonObject());
+		Params->SetStringField(TEXT("type"), TEXT("object"));
+		Params->SetObjectField(TEXT("properties"), Properties);
+
+		TArray<TSharedPtr<FJsonValue>> ReqArray;
+		for (const FString& Req : Required)
+		{
+			ReqArray.Add(MakeShareable(new FJsonValueString(Req)));
+		}
+		Params->SetArrayField(TEXT("required"), ReqArray);
+
+		return Params;
+	};
+
+	auto MakeStringProp = [](const FString& Description)
+	{
+		TSharedPtr<FJsonObject> Prop = MakeShareable(new FJsonObject());
+		Prop->SetStringField(TEXT("type"), TEXT("string"));
+		Prop->SetStringField(TEXT("description"), Description);
+		return Prop;
+	};
+
+	// update_enemy_reaction — called once per enemy that reacts this turn
+	{
+		TSharedPtr<FJsonObject> Props = MakeShareable(new FJsonObject());
+		Props->SetObjectField(TEXT("enemy_name"),        MakeStringProp(TEXT("The enemy's name, must match WORLDSTATE exactly.")));
+		Props->SetObjectField(TEXT("new_status"),        MakeStringProp(TEXT("The enemy's new status: Attacking, Fleeing, Hiding, or Idle.")));
+		Props->SetObjectField(TEXT("new_intent"),        MakeStringProp(TEXT("Updated intent or goal sentence describing what the enemy plans to do.")));
+		Props->SetObjectField(TEXT("action_description"), MakeStringProp(TEXT("One plain-English sentence describing the enemy's immediate action this turn, e.g. 'The goblin raises its club and charges.'")));
+
+		Tools.Add(
+			MakeTool(
+				TEXT("update_enemy_reaction"),
+				TEXT("Record how an enemy reacts to what just happened. Call once per enemy that changes status, intent, or takes an action."),
+				MakeParams(Props, {TEXT("enemy_name"), TEXT("new_status"), TEXT("new_intent"), TEXT("action_description")})
+			)
+		);
+	}
+
+	return Tools;
 }
 
 void UWorldStateAgent::SendMessage(const FString& PlayerInput, const FString& WorldStateJson, const FString& RulesResultJson)
@@ -34,62 +94,66 @@ void UWorldStateAgent::SendMessage(const FString& PlayerInput, const FString& Wo
 
 	const FString WrappedMessage = BuildWrappedUserMessage(WorldStateJson, RulesResultJson, PlayerInput);
 
-	// No need to track all messages, just send System message and the new message
-	TArray<FChatMessage> SingleTurnMessages;
-	SingleTurnMessages.Push(SystemMessage);
-	SingleTurnMessages.Push(FChatMessage("user", WrappedMessage));
-	
-	Super::SendMessage(SingleTurnMessages,
-		[this, PlayerInput](const FString& ResponseContent)
+	TArray<TSharedPtr<FJsonObject>> Messages;
+	Messages.Add(UChatAgent::ChatMessageToJSON(SystemMessage));
+	Messages.Add(UChatAgent::ChatMessageToJSON(FChatMessage("user", WrappedMessage)));
+
+	const TArray<TSharedPtr<FJsonObject>> ToolDefinitions = BuildToolDefinitions();
+
+	TSharedPtr<FWorldReaction> AccumulatedReaction = MakeShareable(new FWorldReaction());
+
+	auto HandleToolCall = [AccumulatedReaction](const FString& ToolName, const TSharedPtr<FJsonObject>& Args) -> FString
+	{
+		if (ToolName == TEXT("update_enemy_reaction"))
 		{
-			HandleResponse(ResponseContent, PlayerInput);
-		});
-}
+			FEnemyReaction Reaction;
+			Reaction.Name              = Args->GetStringField(TEXT("enemy_name"));
+			Reaction.NewStatus         = Args->GetStringField(TEXT("new_status"));
+			Reaction.NewIntent         = Args->GetStringField(TEXT("new_intent"));
+			Reaction.ActionDescription = Args->GetStringField(TEXT("action_description"));
 
-void UWorldStateAgent::HandleResponse(const FString& ResponseContent, const FString& PlayerInput)
-{
-	FString WorldReactionJson;
-	FWorldReaction WorldReaction;
-	JsonToWorldReaction(ResponseContent, WorldReaction, WorldReactionJson);
+			// Replace existing entry for this enemy if the model calls the tool twice for the same enemy
+			int32 Existing = AccumulatedReaction->EnemyReactions.IndexOfByPredicate(
+				[&](const FEnemyReaction& R){ return R.Name == Reaction.Name; });
+			if (Existing != INDEX_NONE)
+			{
+				AccumulatedReaction->EnemyReactions[Existing] = Reaction;
+			}
+			else
+			{
+				AccumulatedReaction->EnemyReactions.Add(Reaction);
+			}
+		}
 
-	if (OnWorldReactionReady.IsBound())
+		return TEXT("{\"result\": \"success\"}");
+	};
+
+	auto HandleComplete = [this, AccumulatedReaction, PlayerInput](const FString& FinalContent)
 	{
-		OnWorldReactionReady.Broadcast(WorldReaction, CachedRulesResultJson, WorldReactionJson, PlayerInput);
-	}
-}
+		// Parse worldReactionSummary from the model's final stop message
+		TSharedPtr<FJsonObject> ResultJson;
+		const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(FinalContent);
+		if (FJsonSerializer::Deserialize(Reader, ResultJson) && ResultJson.IsValid())
+		{
+			AccumulatedReaction->WorldReactionSummary = ResultJson->GetStringField(TEXT("worldReactionSummary"));
+		}
+		else
+		{
+			// Fall back to treating the raw content as the summary
+			AccumulatedReaction->WorldReactionSummary = FinalContent;
+			UE_LOG(LogTemp, Warning, TEXT("[WorldStateAgent] Could not parse final JSON; using raw content as summary."));
+		}
 
-void UWorldStateAgent::JsonToWorldReaction(const FString& InJson, FWorldReaction& OutReaction, FString& OutReactionJson)
-{
-	FString CleanJson = InJson;
+		FString WorldReactionJson;
+		FJsonObjectConverter::UStructToJsonObjectString(*AccumulatedReaction, WorldReactionJson);
 
-	CleanJson.TrimStartAndEndInline();
+		UE_LOG(LogTemp, Log, TEXT("[WorldStateAgent::SendMessage] Tool use complete. Reactions=%d"), AccumulatedReaction->EnemyReactions.Num());
 
-	if (CleanJson.Len() > 0 && CleanJson[0] == 0xFEFF)
-	{
-		CleanJson.RemoveAt(0);
-	}
+		if (OnWorldReactionReady.IsBound())
+		{
+			OnWorldReactionReady.Broadcast(*AccumulatedReaction, CachedRulesResultJson, WorldReactionJson, PlayerInput);
+		}
+	};
 
-	CleanJson = CleanJson.Replace(TEXT("```json"), TEXT(""));
-	CleanJson = CleanJson.Replace(TEXT("```JSON"), TEXT(""));
-	CleanJson = CleanJson.Replace(TEXT("```"), TEXT(""));
-	OutReactionJson = CleanJson;
-
-	UE_LOG(LogTemp, Log, TEXT("[WorldStateAgent::JsonToWorldReaction] Cleaned JSON: %s"), *CleanJson);
-
-	TSharedPtr<FJsonObject> RootObj;
-	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(CleanJson);
-	if (!FJsonSerializer::Deserialize(Reader, RootObj) || !RootObj.IsValid())
-	{
-		UE_LOG(LogTemp, Error, TEXT("[WorldStateAgent::JsonToWorldReaction] Failed to parse JSON: %s"), *CleanJson);
-		return;
-	}
-
-	if (!FJsonObjectConverter::JsonObjectToUStruct(
-		RootObj.ToSharedRef(),
-		FWorldReaction::StaticStruct(),
-		&OutReaction,
-		0, 0))
-	{
-		UE_LOG(LogTemp, Error, TEXT("[WorldStateAgent::JsonToWorldReaction] Failed to convert JSON to FWorldReaction."));
-	}
+	SendMessageWithTools(Messages, ToolDefinitions, HandleToolCall, HandleComplete);
 }

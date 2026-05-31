@@ -22,6 +22,10 @@ struct FRulesUpdate
 	UPROPERTY(meta = (JsonProperty = "itemsPickedUp"))
 	TArray<FString> ItemsPickedUp;
 
+	/** The list of any items removed from the inventory due to the player's action. */
+	UPROPERTY(meta = (JsonProperty = "itemsRemoved"))
+	TArray<FString> ItemsRemoved;
+
 	/** Struct of any changes that need to be made to the World State. */
 	UPROPERTY(meta = (JsonProperty = "stateChanges"))
 	FWorldStateUpdate StateChanges;

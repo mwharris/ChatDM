@@ -29,9 +29,6 @@ public:
 	void SendMessage(const FString& PlayerInput, const FString& WorldStateJson);
 
 private:
-	/** Handle response from ChatGPT: parse JSON, update world state. */
-	virtual void HandleResponse(const FString& ResponseContent, const FString& PlayerInput) override;
-
-	/** Helper function to parse the JSON returned from the Rules Agent. */
-	void JsonToRulesUpdate(const FString& InJson, FRulesUpdate& OutRulesUpdate, FString& OutRulesResultJson);
+	/** Build tools definitions */
+	TArray<TSharedPtr<FJsonObject>> BuildToolDefinitions();
 };

@@ -69,7 +69,16 @@ void UNarratorAgent::HandleResponse(const FString& ResponseContent, const FStrin
 {
 	UE_LOG(LogTemp, Log, TEXT("[NarratorAgent] Response: %s"), *ResponseContent);
 
+	MessageLog.Push(FChatMessage("assistant", ResponseContent));
 
+	if (OnNarratorResultReady.IsBound())
+	{
+		OnNarratorResultReady.Broadcast(ResponseContent, PlayerInput);
+	}
+
+	/*
+	 * TODO: Removed because this is not adding anything meaningful right now
+	 * 
 	// Re-validate the narration if we're not starting up
 	if (MessageLog.Num() > 2)
 	{
@@ -85,6 +94,7 @@ void UNarratorAgent::HandleResponse(const FString& ResponseContent, const FStrin
 			OnNarratorResultReady.Broadcast(ResponseContent, PlayerInput);
 		}
 	}
+	*/
 }
 
 void UNarratorAgent::ValidateNarration(const FString& Narration, const FString& PlayerInput)
