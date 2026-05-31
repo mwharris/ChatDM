@@ -23,12 +23,14 @@ void UChatGPTManager::InitializeAgents()
 	
 	RulesAgent = NewObject<URulesAgent>(this, URulesAgent::StaticClass(), TEXT("RulesAgent"));
 	RulesAgent->Initialize(TEXT(""));
+	RulesAgent->OnStatusUpdate.AddDynamic(this, &UChatGPTManager::HandleRulesAgentStatus);
 
 	NarratorAgent = NewObject<UNarratorAgent>(this, UNarratorAgent::StaticClass(), TEXT("NarratorAgent"));
 	NarratorAgent->Initialize(TEXT(""));
-	
+
 	WorldStateAgent = NewObject<UWorldStateAgent>(this, UWorldStateAgent::StaticClass(), TEXT("WorldStateAgent"));
 	WorldStateAgent->Initialize(TEXT(""));
+	WorldStateAgent->OnStatusUpdate.AddDynamic(this, &UChatGPTManager::HandleWorldStateAgentStatus);
 	
 	FEnemy Goblin;
 	Goblin.EnemyIndex = 0;
@@ -55,7 +57,11 @@ void UChatGPTManager::InitializeAgents()
 void UChatGPTManager::Deinitialize()
 {
 	RulesAgent->OnRulesResultReady.RemoveAll(this);
+	RulesAgent->OnStatusUpdate.RemoveAll(this);
+	
 	WorldStateAgent->OnWorldReactionReady.RemoveAll(this);
+	WorldStateAgent->OnStatusUpdate.RemoveAll(this);
+
 	NarratorAgent->OnNarratorResultReady.RemoveAll(this);
 }
 
@@ -71,13 +77,34 @@ void UChatGPTManager::SendAgentChatRequest(const FString& PlayerInput)
 	ExecuteRulesAgent(PlayerInput);
 }
 
+void UChatGPTManager::BroadcastStatus(const FString& Status) const
+{
+	if (OnPipelineStatusUpdate.IsBound())
+	{
+		OnPipelineStatusUpdate.Broadcast(Status);
+	}
+}
+
+void UChatGPTManager::HandleRulesAgentStatus(const FString& Status)
+{
+	BroadcastStatus(TEXT("RulesAgent: Processing tool calls..."));
+}
+
+void UChatGPTManager::HandleWorldStateAgentStatus(const FString& Status)
+{
+	BroadcastStatus(TEXT("WorldStateAgent: Processing tool calls..."));
+}
+
 void UChatGPTManager::ExecuteRulesAgent(const FString& PlayerInput)
 {
 	if (!IsValid(RulesAgent))
 	{
-		UE_LOG(LogTemp, Error, TEXT("UChatGPTManager::SendAgenticChatRequest(): Rules agent is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("UChatGPTManager::ExecuteRulesAgent(): Rules agent is invalid."));
 		return;
 	}
+
+	// Send a status update to the UI
+	BroadcastStatus(TEXT("RulesAgent: Evaluating your action..."));
 
 	// Bind so we can respond to the RulesAgent completing its request and response processing.
 	if (!RulesAgent->OnRulesResultReady.IsAlreadyBound(this, &UChatGPTManager::HandleRulesResult))
@@ -147,9 +174,12 @@ void UChatGPTManager::ExecuteNarratorAgent(const FString& PlayerInput, const FSt
 {
 	if (!IsValid(NarratorAgent))
 	{
-		UE_LOG(LogTemp, Error, TEXT("[UChatGPTManager::SendAgenticChatRequest()] Narrator agent is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("[UChatGPTManager::ExecuteNarratorAgent()] Narrator agent is invalid."));
 		return;
 	}
+	
+	// Send a status update to the UI
+	BroadcastStatus(TEXT("NarratorAgent: Writing narration..."));
 
 	// Bind so we can respond to the NarratorAgent completing its request and response processing.
 	if (!NarratorAgent->OnNarratorResultReady.IsAlreadyBound(this, &UChatGPTManager::HandleNarratorResult))
@@ -164,20 +194,32 @@ void UChatGPTManager::ExecuteNarratorAgent(const FString& PlayerInput, const FSt
 
 void UChatGPTManager::ExecuteWorldStateAgent(const FString& PlayerInput, const FString& RulesResultJson)
 {
+	if (!IsValid(WorldStateAgent))
+	{
+		UE_LOG(LogTemp, Error, TEXT("UChatGPTManager::ExecuteWorldStateAgent(): WorldStateAgent is invalid."));
+		return;
+	}
+
+	// Send a status update to the UI
+	BroadcastStatus(TEXT("WorldStateAgent: Evaluating NPC reactions..."));
+
+	// Make sure we bind a callback to receive the results
 	if (!WorldStateAgent->OnWorldReactionReady.IsAlreadyBound(this, &UChatGPTManager::HandleWorldStateResult))
 	{
 		WorldStateAgent->OnWorldReactionReady.AddDynamic(this, &UChatGPTManager::HandleWorldStateResult);
 	}
 
+	// Send a message to our WorldStateAgent
 	const FString WorldStateJson = WorldStateToJson(WorldState);
 	WorldStateAgent->SendMessage(PlayerInput, WorldStateJson, RulesResultJson);
 }
 
 void UChatGPTManager::HandleNarratorResult(const FString& NarratorResult, const FString& PlayerInput)
 {
-	// TODO: We shouldn't need to update WorldState here because Narrator should not be changing state.
-	
 	OnChatGptResponseReceived.Broadcast(NarratorResult, false);
+
+	// Clear the status indicator now that the full pipeline is done
+	BroadcastStatus(TEXT(""));
 }
 
 void UChatGPTManager::HandleWorldStateResult(const FWorldReaction& WorldReaction, const FString& RulesResultJson, const FString& WorldReactionJson,

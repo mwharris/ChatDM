@@ -11,7 +11,7 @@ void UWorldStateAgent::Initialize(const FString& InPrompt)
 	UE_LOG(LogTemp, Log, TEXT("UWorldStateAgent::Initialize(): WorldStateAgent initialized."));
 
 	static const FString DataTablePath = TEXT("/Game/Assets/DT_Prompts.DT_Prompts");
-	UDataTable* DataTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *DataTablePath));
+	const UDataTable* DataTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *DataTablePath));
 	if (!DataTable)
 	{
 		UE_LOG(LogTemp, Error, TEXT("UWorldStateAgent::Initialize(): Failed to load DataTable at %s"), *DataTablePath);
@@ -30,7 +30,7 @@ TArray<TSharedPtr<FJsonObject>> UWorldStateAgent::BuildToolDefinitions()
 {
 	TArray<TSharedPtr<FJsonObject>> Tools;
 
-	auto MakeTool = [](const FString& Name, const FString& Description, TSharedPtr<FJsonObject> Parameters)
+	auto MakeTool = [](const FString& Name, const FString& Description, const TSharedPtr<FJsonObject>& Parameters)
 	{
 		TSharedPtr<FJsonObject> Function = MakeShareable(new FJsonObject());
 		Function->SetStringField(TEXT("name"), Name);
@@ -44,7 +44,7 @@ TArray<TSharedPtr<FJsonObject>> UWorldStateAgent::BuildToolDefinitions()
 		return Tool;
 	};
 
-	auto MakeParams = [](TSharedPtr<FJsonObject> Properties, TArray<FString> Required)
+	auto MakeParams = [](const TSharedPtr<FJsonObject>& Properties, TArray<FString> Required)
 	{
 		TSharedPtr<FJsonObject> Params = MakeShareable(new FJsonObject());
 		Params->SetStringField(TEXT("type"), TEXT("object"));
@@ -69,21 +69,19 @@ TArray<TSharedPtr<FJsonObject>> UWorldStateAgent::BuildToolDefinitions()
 	};
 
 	// update_enemy_reaction — called once per enemy that reacts this turn
-	{
-		TSharedPtr<FJsonObject> Props = MakeShareable(new FJsonObject());
-		Props->SetObjectField(TEXT("enemy_name"),        MakeStringProp(TEXT("The enemy's name, must match WORLDSTATE exactly.")));
-		Props->SetObjectField(TEXT("new_status"),        MakeStringProp(TEXT("The enemy's new status: Attacking, Fleeing, Hiding, or Idle.")));
-		Props->SetObjectField(TEXT("new_intent"),        MakeStringProp(TEXT("Updated intent or goal sentence describing what the enemy plans to do.")));
-		Props->SetObjectField(TEXT("action_description"), MakeStringProp(TEXT("One plain-English sentence describing the enemy's immediate action this turn, e.g. 'The goblin raises its club and charges.'")));
+	const TSharedPtr<FJsonObject> Props = MakeShareable(new FJsonObject());
+	Props->SetObjectField(TEXT("enemy_name"), MakeStringProp(TEXT("The enemy's name, must match WORLDSTATE exactly.")));
+	Props->SetObjectField(TEXT("new_status"), MakeStringProp(TEXT("The enemy's new status: Attacking, Fleeing, Hiding, or Idle.")));
+	Props->SetObjectField(TEXT("new_intent"), MakeStringProp(TEXT("Updated intent or goal sentence describing what the enemy plans to do.")));
+	Props->SetObjectField(TEXT("action_description"), MakeStringProp(TEXT("One plain-English sentence describing the enemy's immediate action this turn, e.g. 'The goblin raises its club and charges.'")));
 
-		Tools.Add(
-			MakeTool(
-				TEXT("update_enemy_reaction"),
-				TEXT("Record how an enemy reacts to what just happened. Call once per enemy that changes status, intent, or takes an action."),
-				MakeParams(Props, {TEXT("enemy_name"), TEXT("new_status"), TEXT("new_intent"), TEXT("action_description")})
-			)
-		);
-	}
+	Tools.Add(
+		MakeTool(
+			TEXT("update_enemy_reaction"),
+			TEXT("Record how an enemy reacts to what just happened. Call once per enemy that changes status, intent, or takes an action."),
+			MakeParams(Props, {TEXT("enemy_name"), TEXT("new_status"), TEXT("new_intent"), TEXT("action_description")})
+		)
+	);
 
 	return Tools;
 }
@@ -107,14 +105,13 @@ void UWorldStateAgent::SendMessage(const FString& PlayerInput, const FString& Wo
 		if (ToolName == TEXT("update_enemy_reaction"))
 		{
 			FEnemyReaction Reaction;
-			Reaction.Name              = Args->GetStringField(TEXT("enemy_name"));
-			Reaction.NewStatus         = Args->GetStringField(TEXT("new_status"));
-			Reaction.NewIntent         = Args->GetStringField(TEXT("new_intent"));
+			Reaction.Name = Args->GetStringField(TEXT("enemy_name"));
+			Reaction.NewStatus = Args->GetStringField(TEXT("new_status"));
+			Reaction.NewIntent = Args->GetStringField(TEXT("new_intent"));
 			Reaction.ActionDescription = Args->GetStringField(TEXT("action_description"));
 
 			// Replace existing entry for this enemy if the model calls the tool twice for the same enemy
-			int32 Existing = AccumulatedReaction->EnemyReactions.IndexOfByPredicate(
-				[&](const FEnemyReaction& R){ return R.Name == Reaction.Name; });
+			int32 Existing = AccumulatedReaction->EnemyReactions.IndexOfByPredicate([&](const FEnemyReaction& R){ return R.Name == Reaction.Name; });
 			if (Existing != INDEX_NONE)
 			{
 				AccumulatedReaction->EnemyReactions[Existing] = Reaction;

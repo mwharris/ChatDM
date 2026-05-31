@@ -6,6 +6,8 @@
 #include "ChatMessage.h"
 #include "ChatAgent.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAgentStatusUpdate, const FString&, Status);
+
 /**
  * Base class for the different AI agents
  */
@@ -17,6 +19,10 @@ class CHATDM_API UChatAgent : public UObject
 public:
 	const FString Model = TEXT("gpt-4o-mini");
 	FChatMessage SystemMessage;
+
+	/** Fired each time SendMessageWithTools receives a tool_calls response, so the manager can surface status to the UI. */
+	UPROPERTY(BlueprintAssignable)
+	FOnAgentStatusUpdate OnStatusUpdate;
 
 	UFUNCTION()
 	virtual void Initialize(const FString& InPrompt);
@@ -46,5 +52,9 @@ protected:
 	FString BuildWrappedUserMessage(const FString& CurrentWorldStateJson, const FString& RulesResultJson, const FString& PlayerInput) const;
 	FString BuildWrappedUserMessage(const FString& CurrentWorldStateJson, const FString& RulesResultJson, const FString& WorldReactionJson, const FString& PlayerInput) const;
 	FString BuildWrappedUserMessage(const FString& CurrentWorldStateJson, const FString& PlayerInput) const;
+
+private:
+	/** Helper function to load our locally save API Keys from config */ 
+	static FString GetAPIKey();
 	
 };

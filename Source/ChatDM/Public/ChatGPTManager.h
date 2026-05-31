@@ -13,6 +13,7 @@ class UWorldStateAgent;
 struct FRulesUpdate;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnChatGptResponseReceived, const FString&, Response, bool, IsPlayer);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPipelineStatusUpdate, const FString&, Status);
 
 /** Handle sending HTTP requests to ChatGPT API */
 UCLASS(Blueprintable)
@@ -21,21 +22,29 @@ class CHATDM_API UChatGPTManager : public UObject
 	GENERATED_BODY()
 
 public:
+	/** Cached reference to the RulesAgent */
 	UPROPERTY()
 	URulesAgent* RulesAgent;
 
+	/** Cached reference to the NarratorAgent */
 	UPROPERTY()
 	UNarratorAgent* NarratorAgent;
 
+	/** Cached reference to the WorldStateAgent */
 	UPROPERTY()
 	UWorldStateAgent* WorldStateAgent;
 
+	/** Cached WorldState to track the state of rooms, enemies, items, etc. */
 	UPROPERTY()
 	FWorldState WorldState;
 
 	/** Delegate fired when we receive a response from ChatGPT */
 	UPROPERTY(BlueprintAssignable, Category="ChatDM")
 	FOnChatGptResponseReceived OnChatGptResponseReceived;
+
+	/** Delegate fired at each stage of the agent pipeline so the UI can show live status. */
+	UPROPERTY(BlueprintAssignable, Category="ChatDM")
+	FOnPipelineStatusUpdate OnPipelineStatusUpdate;
 
 	/** Initialize fn for pulling the prompts DT and sending a setup message to ChatGPT */
 	UFUNCTION(BlueprintCallable, Category = "ChatGPT")
@@ -85,8 +94,19 @@ private:
 	/** Handle the result of the NarratorAgent processing AI's response */
 	UFUNCTION()
 	void HandleNarratorResult(const FString& NarratorResult, const FString& PlayerInput);
+
+	/** Re-broadcast RulesAgent tool-loop status to OnPipelineStatusUpdate */
+	UFUNCTION()
+	void HandleRulesAgentStatus(const FString& Status);
+
+	/** Re-broadcast WorldStateAgent tool-loop status to OnPipelineStatusUpdate */
+	UFUNCTION()
+	void HandleWorldStateAgentStatus(const FString& Status);
+
+	/** Helper function for broadcasting pipeline status */
+	void BroadcastStatus(const FString& Status) const;
 	
 	/** Helper function to convert FWorldState into JSON needed for HTTP requests. */
-	FString WorldStateToJson(const FWorldState& State);
+	static FString WorldStateToJson(const FWorldState& State);
 
 };

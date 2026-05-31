@@ -23,7 +23,7 @@ void UChatAgent::SendMessageWithTools(TArray<TSharedPtr<FJsonObject>> Messages,
 	HttpRequest->SetURL(TEXT("https://api.openai.com/v1/chat/completions"));
 	HttpRequest->SetVerb(TEXT("POST"));
 	HttpRequest->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-	HttpRequest->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), TEXT("")));
+	HttpRequest->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *GetAPIKey()));
 
 	// Convert message objects to JSON values for the payload
 	TArray<TSharedPtr<FJsonValue>> MessagesArray;
@@ -101,6 +101,9 @@ void UChatAgent::SendMessageWithTools(TArray<TSharedPtr<FJsonObject>> Messages,
 			// reasoning toward it's final answer.
 			if (FinishReason == TEXT("tool_calls"))
 			{
+				// Notify ChatGPTManager that we're now processing tool calls
+				OnStatusUpdate.Broadcast(TEXT("tool_calls"));
+
 				// Add assistant message to the log
 				Messages.Add(AssistantMessage);
 
@@ -168,7 +171,7 @@ void UChatAgent::SendMessage(TArray<FChatMessage>& MessageLog,
 	HttpRequest->SetURL(OpenAiUrl);
 	HttpRequest->SetVerb(TEXT("POST"));
 	HttpRequest->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-	HttpRequest->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), TEXT("")));
+	HttpRequest->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *GetAPIKey()));
 
 	TArray<TSharedPtr<FJsonValue>> MessagesArray;
 
@@ -341,4 +344,23 @@ FString UChatAgent::BuildWrappedUserMessage(const FString& CurrentWorldStateJson
 		*CurrentWorldStateJson,
 		*PlayerInput
 	);
+}
+
+FString UChatAgent::GetAPIKey()
+{
+	// ProjectConfigDir() is the path to the config directory.
+	// '/' operator acts as a path concatenation and joins the APIKeys.ini filename.
+	const FString ConfigPath = FPaths::ProjectConfigDir() / TEXT("APIKeys.ini");
+
+	// Load the file and pull the [ChatDM] section, OpenAIApiKey value.
+	FString Key;
+	GConfig->LoadFile(ConfigPath);
+	GConfig->GetString(TEXT("ChatDM"), TEXT("OpenAIApiKey"), Key, ConfigPath);
+
+	if (Key.IsEmpty())
+	{
+		UE_LOG(LogTemp, Error, TEXT("[ChatAgent] OpenAIApiKey not found in Config/APIKeys.ini"));
+	}
+
+	return Key;
 }
