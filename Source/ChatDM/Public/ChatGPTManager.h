@@ -108,5 +108,4 @@ private:
 	
 	/** Helper function to convert FWorldState into JSON needed for HTTP requests. */
 	static FString WorldStateToJson(const FWorldState& State);
-
 };

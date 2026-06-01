@@ -237,9 +237,19 @@ void URulesAgent::SendMessage(const FString& PlayerInput, const FString& WorldSt
 	// All tool calls have been recorded into AccumulatedResult.
 	auto HandleComplete = [this, AccumulatedResult, PlayerInput](const FString& FinalContent)
 	{
+		// The model should output bare JSON, but may wrap it in markdown fences or prose.
+		// Extract the first { ... } block we can find and try to parse that.
+		FString Cleaned = FinalContent;
+		const int32 OpenBrace  = Cleaned.Find(TEXT("{"));
+		const int32 CloseBrace = Cleaned.Find(TEXT("}"), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+		if (OpenBrace != INDEX_NONE && CloseBrace != INDEX_NONE && CloseBrace > OpenBrace)
+		{
+			Cleaned = Cleaned.Mid(OpenBrace, CloseBrace - OpenBrace + 1);
+		}
+
 		// Parse success and reason from the model's final content message
 		TSharedPtr<FJsonObject> ResultJson;
-		const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(FinalContent);
+		const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Cleaned);
 		if (FJsonSerializer::Deserialize(Reader, ResultJson) && ResultJson.IsValid())
 		{
 			AccumulatedResult->bSuccess = ResultJson->GetBoolField(TEXT("success"));

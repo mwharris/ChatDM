@@ -52,6 +52,7 @@ void UChatGPTManager::InitializeAgents()
 	WorldState.PlayerHeldItems.Add(TEXT("Longsword"));
 	WorldState.PlayerHeldItems.Add(TEXT("Wooden Shield"));
 	WorldState.PlayerHeldItems.Add(TEXT("Healing Potion"));
+	WorldState.PlayerHeldItems.Add(TEXT("10 coins"));
 }
 
 void UChatGPTManager::Deinitialize()
